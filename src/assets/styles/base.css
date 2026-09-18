@@ -1,0 +1,62 @@
+/* ==========================================================================
+   全局基础样式
+   只包含：reset、页面容器、跨组件共享的 @keyframes。
+   其余样式一律写在各自组件的 <style scoped> 内，保证作用域隔离。
+   ========================================================================== */
+
+html {
+  box-sizing: border-box;
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+  margin: 0;
+}
+
+body {
+  min-height: 100svh;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: var(--c-text);
+  background: var(--c-bg);
+}
+
+img {
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* 页面内容容器：about / news / contact 三页共用，故放在全局层 */
+.container {
+  max-width: var(--container-w);
+  margin: 0 auto;
+  padding: 0 5%;
+}
+
+/* 通用卡片入场动画：products / news 两页共用 */
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 加载哨兵的小转圈 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

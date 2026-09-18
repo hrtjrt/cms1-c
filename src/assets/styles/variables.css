@@ -1,0 +1,75 @@
+/* ==========================================================================
+   全局设计令牌
+   取值全部来自原项目 hjc/css 中的硬编码色值与尺寸，迁移为 CSS 变量后
+   各组件的 scoped 样式一律通过 var() 引用，避免同一个色值散落多处。
+   ========================================================================== */
+
+:root {
+  /* ---------- 品牌色 ---------- */
+  --c-primary: #0a17da;
+  --c-primary-dark: #0813b0;
+  --c-primary-soft: #eef1ff;
+  --c-primary-hover: #f0f4ff;
+  --c-primary-a10: rgba(10, 23, 218, 0.1);
+  --c-primary-a55: rgba(10, 23, 218, 0.55);
+  --c-primary-a85: rgba(10, 23, 218, 0.85);
+
+  /* ---------- 文字灰阶 ---------- */
+  --c-ink: #1a2a3a;
+  --c-text: #333;
+  --c-text-sub: #555;
+  --c-text-muted: #777;
+  --c-text-weak: #888;
+  --c-text-faint: #999;
+  --c-text-label: #666;
+  --c-danger: #e63946;
+  --c-accent: #f0c040;
+  --c-black: #000;
+
+  /* ---------- 背景 / 描边 ---------- */
+  --c-bg: #fff;
+  --c-bg-soft: #f5f7fa;
+  --c-bg-softer: #f8faff;
+  --c-line: #ddd;
+  --c-line-soft: #eee;
+  --c-line-softer: #f0f0f0;
+  --c-line-info: #e5e9f0;
+  --c-line-timeline: #d8e0f5;
+  --c-skeleton: #eee;
+  --c-map-bg: #e5e9f0;
+  --c-white: #fff;
+  --c-white-a50: rgba(255, 255, 255, 0.5);
+  --c-white-a75: rgba(255, 255, 255, 0.75);
+  --c-white-a80: rgba(255, 255, 255, 0.8);
+
+  /* ---------- 尺寸 ---------- */
+  --nav-h: 100px;
+  --container-w: 1200px;
+  --container-wide: 1400px;
+  --radius-xs: 2px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --gap-section: 80px;
+
+  /* ---------- 阴影 ---------- */
+  --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 14px 28px rgba(0, 0, 0, 0.12);
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-img: 0 10px 30px rgba(0, 0, 0, 0.15);
+  --shadow-strong: 0 20px 40px rgba(0, 0, 0, 0.12);
+  --shadow-timeline: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-primary: 0 16px 32px rgba(10, 23, 218, 0.12);
+
+  /* ---------- 通用动效 ---------- */
+  --dur-fast: 0.2s;
+  --dur: 0.25s;
+  --dur-base: 0.3s;
+  --dur-slow: 0.5s;
+  --ease: ease;
+  --hover-lift: translateY(-6px);
+  --hover-lift-sm: translateY(-4px);
+}
