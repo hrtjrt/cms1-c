@@ -1,71 +1,81 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PageHero from '@/components/common/PageHero.vue'
-import { fetchCompanyHistory, fetchCoreValues, fetchHonors } from '@/api/about'
-import { unwrap } from '@/utils/request'
-import type { HonorItem, StatItem, TimelineItem, ValueItem } from '@/types'
+import { fetchAbout } from '@/api/about'
+import { assetUrl, resolveHtmlAssets } from '@/utils/request'
+import { useSiteStore } from '@/stores/site'
+import type { HonorItem, PageHeroConfig, StatItem, TimelineItem, ValueItem } from '@/types'
 
-/* 关于我们：整体对应 hjc/about.html + js/about.js */
+/* 关于我们：整体对应 hjc/about.html + js/about.js
 
-/** 公司简介里的统计数字（原为静态 HTML） */
-const STATS: StatItem[] = [
-  { num: '15', unit: '+', label: '行业经验' },
-  { num: '50', unit: '+', label: '出口国家' },
-  { num: '200', unit: '+', label: '团队成员' },
-  { num: '1000', unit: '+', label: '合作客户' }
-]
+   v2 起所有内容（简介正文、统计数字、发展历程、核心价值观、荣誉资质）
+   都来自后台的「关于我们」模块，页面只发一个聚合请求。*/
 
+const site = useSiteStore()
+
+const introText = ref('')
+const introImage = ref('')
+const stats = ref<StatItem[]>([])
 const history = ref<TimelineItem[]>([])
 const values = ref<ValueItem[]>([])
 const honors = ref<HonorItem[]>([])
+const hero = ref<PageHeroConfig | null>(null)
+const failed = ref(false)
+
+/** 简介正文是富文本，展示前补全相对资源地址 */
+const introHtml = computed(() => resolveHtmlAssets(introText.value))
+
+/** 页面 Banner 文案来自后台配置，字段缺失时用本地默认值兜底 */
+const heroProps = computed(() => ({
+  title: hero.value?.title || '关于我们',
+  subtitle: hero.value?.subtitle || '专业 · 创新 · 值得信赖',
+  image: hero.value?.image || '',
+  height: hero.value?.height || '420px',
+  heightSm: hero.value?.heightSm || '320px',
+  mask: hero.value?.mask || 'rgba(10, 23, 218, 0.55)',
+  letterSpacing: hero.value?.letterSpacing || '2px',
+  subtitleSize: hero.value?.subtitleSize || '1.2rem',
+  subtitleSpacing: hero.value?.subtitleSpacing || '4px',
+  subtitleOpacity: hero.value?.subtitleOpacity || '0.9'
+}))
 
 onMounted(async () => {
-  const [historyData, valuesData, honorsData] = await Promise.all([
-    unwrap(fetchCompanyHistory()),
-    unwrap(fetchCoreValues()),
-    unwrap(fetchHonors())
-  ])
-  history.value = historyData
-  values.value = valuesData
-  honors.value = honorsData
+  hero.value = await site.loadPageHero('about')
+  try {
+    const data = await fetchAbout()
+    introText.value = data.intro.content
+    introImage.value = data.intro.image
+    stats.value = data.stats
+    history.value = data.history
+    values.value = data.values
+    honors.value = data.honors
+  } catch {
+    failed.value = true
+  }
 })
 </script>
 
 <template>
   <main class="about-page">
-    <PageHero
-      title="关于我们"
-      subtitle="专业 · 创新 · 值得信赖"
-      image="https://picsum.photos/1920/600?random=200&blur=3"
-      height="420px"
-      height-sm="320px"
-      mask="rgba(10, 23, 218, 0.55)"
-      letter-spacing="2px"
-      subtitle-size="1.2rem"
-      subtitle-spacing="4px"
-      subtitle-opacity="0.9"
-    />
+    <PageHero v-bind="heroProps" />
+
+    <div v-if="failed" class="offline-tip">
+      数据加载失败：请确认后端服务已启动（默认 http://localhost:3000）
+    </div>
 
     <!-- 公司简介 -->
     <section class="about-section intro-section">
       <div class="container">
         <div class="intro-layout">
           <div class="intro-image">
-            <img src="https://picsum.photos/700/500?random=101" alt="公司环境" />
+            <img :src="assetUrl(introImage)" alt="公司环境" />
           </div>
           <div class="intro-text">
             <h2 class="about-title">公司简介</h2>
-            <p>
-              我们是一家专注于电子产品研发、生产与销售的现代化企业，成立于 2010
-              年。经过十余年的发展，我们已成长为行业领先的解决方案提供商，产品远销全球 50
-              多个国家和地区。
-            </p>
-            <p>
-              公司始终坚持"以客户为中心，以创新为驱动"的理念，持续投入研发，致力于为全球客户提供高品质的产品和优质的服务。
-            </p>
+            <div class="intro-rich" v-html="introHtml" />
 
             <div class="intro-stats">
-              <div v-for="stat in STATS" :key="stat.label" class="stat-item">
+              <div v-for="stat in stats" :key="stat.label" class="stat-item">
                 <div class="stat-num">{{ stat.num }}<span>{{ stat.unit }}</span></div>
                 <div class="stat-label">{{ stat.label }}</div>
               </div>
@@ -96,7 +106,7 @@ onMounted(async () => {
           <div v-for="item in values" :key="item.title" class="value-card">
             <span class="value-icon">{{ item.icon }}</span>
             <h3 class="value-title">{{ item.title }}</h3>
-            <p class="value-desc">{{ item.desc }}</p>
+            <p class="value-desc">{{ item.description }}</p>
           </div>
         </div>
       </div>
@@ -108,7 +118,7 @@ onMounted(async () => {
         <h2 class="about-title center">荣誉资质</h2>
         <div class="honors-grid">
           <div v-for="item in honors" :key="item.name" class="honor-card">
-            <img :src="item.image" :alt="item.name" loading="lazy" />
+            <img :src="assetUrl(item.image)" :alt="item.name" loading="lazy" />
             <div class="honor-name">{{ item.name }}</div>
           </div>
         </div>
@@ -191,6 +201,33 @@ onMounted(async () => {
   line-height: 1.9;
   margin-bottom: 16px;
   font-size: 1rem;
+}
+
+.offline-tip {
+  background: #fff4e6;
+  color: #b45309;
+  border-bottom: 1px solid #ffe0b2;
+  padding: 10px 5%;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* 公司简介正文来自富文本，段落间距统一交给这里 */
+.intro-rich p {
+  margin-bottom: 14px;
+  color: var(--c-text-sub);
+  line-height: 1.9;
+}
+
+.intro-rich h3 {
+  margin: 18px 0 10px;
+  font-size: 1.05rem;
+  color: var(--c-ink);
+}
+
+.intro-rich img {
+  max-width: 100%;
+  border-radius: var(--radius);
 }
 
 .intro-stats {

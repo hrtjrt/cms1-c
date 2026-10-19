@@ -8,7 +8,8 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build"
+    "type-check": "vue-tsc --build",
+    "test:smoke": "node smoke/smoke.mjs"
   },
   "dependencies": {
     "pinia": "^4.0.3",
@@ -20,6 +21,7 @@
     "@types/node": "^24.13.4",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
+    "jsdom": "^30.1.0",
     "npm-run-all2": "^9.0.3",
     "typescript": "~6.0.0",
     "vite": "^8.2.2",

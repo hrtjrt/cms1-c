@@ -1,51 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { assetUrl } from '@/utils/request'
 import type { NewsItem } from '@/types'
 
 /* ==========================================================================
    新闻卡片 —— 对应 hjc/js/news.js 里 renderNewsCard() 生成的 DOM
-   highlight 为真时与外部滚入视图联动：附加 3px 主色描边（原实现写在 JS 内联样式）
+
+   v2 起整卡可点击，emit('select', id) 由列表页跳转到新闻详情页
+   （原实现是跳回本列表做 ?id= 定位高亮，因为当时没有详情页）
    ========================================================================== */
 
-const props = defineProps<{
-  news: NewsItem
-  highlight?: boolean
-}>()
+defineProps<{ news: NewsItem }>()
 
 const emit = defineEmits<{ select: [id: number] }>()
-
-const root = ref<HTMLElement | null>(null)
-
-/** 把当前卡片滚动到视口中央 */
-function scrollIntoView(): void {
-  if (props.highlight && root.value) {
-    root.value.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-}
-
-/*
- * 两种触发路径都要覆盖：
- * 1) 卡片已存在、之后才被置为高亮 -> watch
- * 2) 卡片首次挂载时就带着高亮（父级 locateTarget 在 pre 阶段设置 highlightedId，
- *    该批次的卡片是在同一次渲染里才创建的） -> watch 观察不到 false -> true，
- *    必须由 onMounted 兜底，否则只高亮不滚动。
- * flush: 'post' 保证 DOM 已渲染完再滚。
- */
-onMounted(scrollIntoView)
-watch(() => props.highlight, scrollIntoView, { flush: 'post' })
-
 </script>
 
 <template>
-  <article
-    ref="root"
-    class="news-card"
-    :class="{ highlighted: highlight }"
-    :data-news-id="news.id"
-    @click="emit('select', news.id)"
-  >
+  <article class="news-card" :data-news-id="news.id" @click="emit('select', news.id)">
     <div class="news-card-image">
-      <img :src="news.image" :alt="news.title" loading="lazy" />
+      <img :src="assetUrl(news.image)" :alt="news.title" loading="lazy" />
     </div>
     <div class="news-card-body">
       <div class="news-card-date">{{ news.date }}</div>
@@ -67,10 +39,6 @@ watch(() => props.highlight, scrollIntoView, { flush: 'post' })
   box-shadow: var(--shadow-card);
   transition: transform var(--dur-base) var(--ease), box-shadow var(--dur-base) var(--ease);
   animation: cardFadeIn 0.4s var(--ease);
-}
-
-.highlighted {
-  outline: 3px solid var(--c-primary);
 }
 
 .news-card:hover {

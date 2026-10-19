@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAutoPlay } from '@/composables/useAutoPlay'
+import { assetUrl } from '@/utils/request'
 import type { Banner } from '@/types'
 
 /* ==========================================================================
@@ -55,7 +56,7 @@ function handleSlideClick(banner: Banner): void {
           v-for="banner in banners"
           :key="banner.id"
           class="banner-slide"
-          :style="{ backgroundImage: `url('${banner.image}')` }"
+          :style="{ backgroundImage: `url('${assetUrl(banner.image)}')` }"
           @click="handleSlideClick(banner)"
         >
           <div class="banner-text">{{ banner.title }}</div>

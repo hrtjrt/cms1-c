@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { LOGO_URL, NAV_ITEMS } from '@/config/site'
+import { NAV_ITEMS } from '@/config/site'
+import { useSiteStore } from '@/stores/site'
+import { assetUrl } from '@/utils/request'
 
 /* ==========================================================================
    站点导航栏
@@ -14,6 +16,7 @@ const SCROLL_THRESHOLD = 100
 const TOP_SENSITIVE_ZONE = 80
 
 const route = useRoute()
+const site = useSiteStore()
 
 const navHidden = ref(false)
 
@@ -52,7 +55,7 @@ onBeforeUnmount(() => {
 <template>
   <header class="site-header">
     <div class="all_nav" :class="{ 'nav-hidden': navHidden }">
-      <img :src="LOGO_URL" alt="LOGO" class="h-logo" />
+      <img :src="assetUrl(site.logoUrl)" alt="LOGO" class="h-logo" />
 
       <nav class="main-nav">
         <ul class="nav-links">

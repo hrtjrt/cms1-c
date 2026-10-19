@@ -1,138 +1,83 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import LoadSentinel from '@/components/common/LoadSentinel.vue'
 import NewsCard from '@/components/news/NewsCard.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { fetchNewsList } from '@/api/news'
-import { unwrap } from '@/utils/request'
 import { useSiteStore } from '@/stores/site'
-import type { NewsItem } from '@/types'
+import type { NewsItem, PageHeroConfig } from '@/types'
 
 /* ==========================================================================
    新闻动态
-   对应 hjc/news.html + js/news.js：
-   无限滚动（每批 6 条）、热门文章前 5 条、侧栏联系方式、?id= 定位并高亮 2s
+   对应 hjc/news.html + js/news.js：无限滚动（每批 6 条）+ 热门文章 + 侧栏联系方式
+
+   v2 的变化：
+     · 数据来自 /api/public/news（一次性取全，前端继续用它做分批渲染）
+     · 热门文章改成「置顶新闻」（isTop = 1），语义比「取前 5 条」明确
+     · 点击卡片跳到 /news/:id 详情页，不再做 ?id= 定位高亮（已有正文可看）
    ========================================================================== */
 
 const PAGE_SIZE = 6
-/** 目标新闻未出现在列表中时的轮询间隔，与原实现一致 */
-const LOCATE_INTERVAL = 500
-/** 高亮描边持续时间 */
-const HIGHLIGHT_DURATION = 2000
-const HOT_COUNT = 5
 
-const route = useRoute()
 const router = useRouter()
 const site = useSiteStore()
 
 const allNews = ref<NewsItem[]>([])
-const highlightedId = ref<number | null>(null)
-/** 是否已经完成过定位：避免后续滚动加载再次触发滚动定位 */
-const located = ref(false)
+const hero = ref<PageHeroConfig | null>(null)
+const failed = ref(false)
 
 const sentinelRef = ref<InstanceType<typeof LoadSentinel> | null>(null)
 const sentinelEl = computed(() => sentinelRef.value?.root ?? null)
 
-const { displayedItems, statusText, done, loadMore, reload } = useInfiniteScroll<NewsItem>({
+const { displayedItems, statusText, done, reload } = useInfiniteScroll<NewsItem>({
   sentinel: sentinelEl,
   items: allNews,
   pageSize: PAGE_SIZE
 })
 
-const hotList = computed(() => allNews.value.slice(0, HOT_COUNT))
+/** 热门文章 = 置顶新闻；没有置顶时退化为最新 5 条 */
+const hotList = computed(() => {
+  const top = allNews.value.filter((item) => item.isTop === 1)
+  return (top.length > 0 ? top : allNews.value).slice(0, 5)
+})
 
-let locateTimer: number | null = null
-let highlightTimer: number | null = null
-
-function clearTimers(): void {
-  if (locateTimer !== null) {
-    window.clearTimeout(locateTimer)
-    locateTimer = null
-  }
-  if (highlightTimer !== null) {
-    window.clearTimeout(highlightTimer)
-    highlightTimer = null
-  }
-}
-
-/** 读取 URL 上的 ?id= */
-function resolveTargetId(): number | null {
-  const raw = route.query.id
-  const value = Array.isArray(raw) ? raw[0] : raw
-  if (typeof value !== 'string') return null
-  const parsed = Number.parseInt(value, 10)
-  return Number.isNaN(parsed) ? null : parsed
-}
-
-/**
- * 轮询加载直到目标新闻出现在列表中，然后滚动到视野中央并描边 2s。
- * 与原实现 loadUntilTarget() 的节奏一致（500ms 一轮）。
- */
-function locateTarget(): void {
-  const targetId = resolveTargetId()
-  if (targetId === null || located.value) return
-
-  if (displayedItems.value.some((item) => item.id === targetId)) {
-    located.value = true
-    highlightedId.value = targetId
-    if (highlightTimer !== null) window.clearTimeout(highlightTimer)
-    highlightTimer = window.setTimeout(() => {
-      highlightTimer = null
-      highlightedId.value = null
-    }, HIGHLIGHT_DURATION)
-    return
-  }
-
-  if (displayedItems.value.length < allNews.value.length) {
-    if (locateTimer !== null) window.clearTimeout(locateTimer)
-    locateTimer = window.setTimeout(() => {
-      locateTimer = null
-      loadMore()
-    }, LOCATE_INTERVAL)
-  }
-}
-
-watch(displayedItems, locateTarget)
-
-// 路由上 id 变化时重新定位
-watch(
-  () => route.query.id,
-  () => {
-    clearTimers()
-    located.value = false
-    highlightedId.value = null
-    locateTarget()
-  }
-)
+/** 页面 Banner 文案来自后台的「页面 Banner」配置 */
+const heroProps = computed(() => ({
+  title: hero.value?.title || '新闻动态',
+  subtitle: hero.value?.subtitle || 'NEWS & EVENTS',
+  image: hero.value?.image || '',
+  height: hero.value?.height || '380px',
+  heightSm: hero.value?.heightSm || '280px',
+  mask: hero.value?.mask || 'rgba(26, 42, 58, 0.6)'
+}))
 
 function goToNews(id: number): void {
-  router.push({ path: '/news', query: { id: String(id) } })
+  void router.push('/news/' + id)
 }
 
 onMounted(async () => {
-  allNews.value = await unwrap(fetchNewsList())
+  hero.value = await site.loadPageHero('news')
+  try {
+    allNews.value = await fetchNewsList()
+  } catch {
+    failed.value = true
+  }
   reload()
-  locateTarget()
 })
-
-onBeforeUnmount(clearTimers)
 </script>
 
 <template>
   <main class="news-page">
-    <PageHero
-      title="新闻动态"
-      subtitle="NEWS & EVENTS"
-      image="https://picsum.photos/1920/600?random=400&blur=3"
-      height="380px"
-      height-sm="280px"
-      mask="rgba(26, 42, 58, 0.6)"
-    />
+    <PageHero v-bind="heroProps" />
 
     <section class="news-page-section">
       <div class="container">
+        <div v-if="failed" class="offline-tip">
+          数据加载失败：请确认后端服务已启动（默认 http://localhost:3000）
+        </div>
+
         <div class="news-layout">
           <!-- 左侧：新闻列表 -->
           <div class="news-main">
@@ -141,7 +86,6 @@ onBeforeUnmount(clearTimers)
                 v-for="item in displayedItems"
                 :key="item.id"
                 :news="item"
-                :highlight="highlightedId === item.id"
                 @select="goToNews"
               />
             </div>
@@ -175,6 +119,16 @@ onBeforeUnmount(clearTimers)
 .news-page-section {
   padding: 60px 0;
   background: var(--c-bg-soft);
+}
+
+.offline-tip {
+  background: #fff4e6;
+  color: #b45309;
+  border: 1px solid #ffe0b2;
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
 }
 
 .news-layout {

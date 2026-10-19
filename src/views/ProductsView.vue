@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import LoadSentinel from '@/components/common/LoadSentinel.vue'
 import ProductCard from '@/components/product/ProductCard.vue'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useSiteStore } from '@/stores/site'
 import { fetchProducts } from '@/api/product'
-import { unwrap } from '@/utils/request'
 import type { Product } from '@/types'
 
 /* ==========================================================================
@@ -20,12 +19,19 @@ const SEARCH_DEBOUNCE = 300
 const ALL = 'all'
 
 const route = useRoute()
+const router = useRouter()
 const site = useSiteStore()
 
 const allProducts = ref<Product[]>([])
 const category = ref<string>(ALL)
 const searchInput = ref('')
 const keyword = ref('')
+const failed = ref(false)
+
+/** 点击卡片进入商品详情页 */
+function goToDetail(id: number): void {
+  void router.push('/products/' + id)
+}
 
 const sentinelRef = ref<InstanceType<typeof LoadSentinel> | null>(null)
 const sentinelEl = computed(() => sentinelRef.value?.root ?? null)
@@ -47,6 +53,17 @@ const { displayedItems, statusText, done, reload } = useInfiniteScroll<Product>(
 
 const pageTitle = computed(
   () => site.categoryOptions.find((item) => item.value === category.value)?.label ?? '全部产品'
+)
+
+/** 侧栏分类项带上商品数（数字来自后端 /api/public/categories 的聚合结果） */
+const categoryOptions = computed(() =>
+  site.categoryOptions.map((item) => ({
+    ...item,
+    count:
+      item.value === ALL
+        ? site.categoryList.reduce((sum, entry) => sum + Number(entry.productCount ?? 0), 0)
+        : Number(site.categoryList.find((entry) => entry.name === item.value)?.productCount ?? 0)
+  }))
 )
 
 const productsCount = computed(() => `共 ${filteredProducts.value.length} 件产品`)
@@ -84,7 +101,11 @@ function resolveInitialCategory(): string {
 }
 
 onMounted(async () => {
-  allProducts.value = await unwrap(fetchProducts())
+  try {
+    allProducts.value = await fetchProducts()
+  } catch {
+    failed.value = true
+  }
   category.value = resolveInitialCategory()
   reload()
 })
@@ -96,6 +117,10 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="products-page">
+    <div v-if="failed" class="offline-tip">
+      数据加载失败：请确认后端服务已启动（默认 http://localhost:3000）
+    </div>
+
     <!-- 左侧边栏 -->
     <aside class="sidebar">
       <div class="search-box">
@@ -106,13 +131,14 @@ onBeforeUnmount(() => {
       <h3 class="sidebar-title">产品分类</h3>
       <ul class="category-list">
         <li
-          v-for="item in site.categoryOptions"
+          v-for="item in categoryOptions"
           :key="item.value"
           :class="{ active: category === item.value }"
           :data-category="item.value"
           @click="selectCategory(item.value)"
         >
-          {{ item.label }}
+          <span>{{ item.label }}</span>
+          <span class="category-count">{{ item.count }}</span>
         </li>
       </ul>
     </aside>
@@ -125,7 +151,12 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="products-grid">
-        <ProductCard v-for="product in displayedItems" :key="product.id" :product="product" />
+        <ProductCard
+          v-for="product in displayedItems"
+          :key="product.id"
+          :product="product"
+          @select="goToDetail"
+        />
         <div v-if="filteredProducts.length === 0" class="empty-state">
           没有找到符合条件的产品，换个关键词试试～
         </div>
@@ -234,8 +265,40 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
+.category-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .category-list li + li {
   border-top: 1px solid var(--c-line-softer);
+}
+
+.category-count {
+  font-size: 0.75rem;
+  color: var(--c-text-faint);
+  background: var(--c-bg-soft);
+  border-radius: 10px;
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+
+.category-list li.active .category-count {
+  background: var(--c-bg);
+  color: var(--c-primary);
+}
+
+.offline-tip {
+  width: 100%;
+  background: #fff4e6;
+  color: #b45309;
+  border: 1px solid #ffe0b2;
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
 }
 
 /* 右侧产品区 */

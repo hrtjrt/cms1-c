@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# smoke test temporary build output (npm run test:smoke)
+.smoke

@@ -2,7 +2,8 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAutoPlay } from '@/composables/useAutoPlay'
-import type { NewsPreview } from '@/types'
+import { assetUrl } from '@/utils/request'
+import type { NewsItem } from '@/types'
 
 /* ==========================================================================
    模块3：新闻资讯
@@ -10,10 +11,10 @@ import type { NewsPreview } from '@/types'
    - 鼠标移入标题：高亮该条并淡出/淡入左侧配图，同时暂停自动播放
    - 鼠标移出整个列表：恢复自动播放
    - 4s 自动轮播切换高亮
-   - 点击标题 / 图片：跳转新闻列表页并携带 id
+   - 点击标题 / 图片：进入新闻详情页
    ========================================================================== */
 
-const props = defineProps<{ news: NewsPreview[] }>()
+const props = defineProps<{ news: NewsItem[] }>()
 
 const NEWS_INTERVAL = 4000
 const FADE_DELAY = 200
@@ -35,7 +36,7 @@ function switchNews(index: number): void {
   if (fadeTimer !== null) window.clearTimeout(fadeTimer)
   fadeTimer = window.setTimeout(() => {
     fadeTimer = null
-    displayedSrc.value = props.news[currentIndex.value]?.image ?? ''
+    displayedSrc.value = assetUrl(props.news[currentIndex.value]?.image ?? '')
     imageOpacity.value = 1
   }, FADE_DELAY)
 }
@@ -48,7 +49,8 @@ function handleItemEnter(index: number): void {
 function goToNews(index: number): void {
   const item = props.news[index]
   if (!item) return
-  router.push({ path: '/news', query: { id: String(item.id) } })
+  // v2：进入详情页看正文（原实现只能回到列表做定位高亮）
+  router.push('/news/' + item.id)
 }
 
 const next = (): void => {
@@ -67,7 +69,7 @@ watch(
   () => props.news,
   (list) => {
     currentIndex.value = 0
-    displayedSrc.value = list[0]?.image ?? ''
+    displayedSrc.value = assetUrl(list[0]?.image ?? '')
     imageOpacity.value = 1
   },
   { immediate: true }

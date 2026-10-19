@@ -2,17 +2,19 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAutoPlay } from '@/composables/useAutoPlay'
-import type { HomeProduct } from '@/types'
+import { assetUrl } from '@/utils/request'
+import type { Product } from '@/types'
 
 /* ==========================================================================
    模块2：产品介绍舞台
    行为搬运自 hjc/js/home.js 模块2：
    - 中间卡片 current、左右相邻 side-left / side-right、其余 hidden
    - 3.5s 自动轮播，悬停暂停
-   - 点击中间卡片跳转产品中心并带上分类参数；点击两侧卡片先切到中间
+   - 点击中间卡片进入该商品的详情页；点击两侧卡片先切到中间
+   数据来自 /api/public/home 的 products（show_on_homepage = 1 的那 5 件）
    ========================================================================== */
 
-const props = defineProps<{ products: HomeProduct[] }>()
+const props = defineProps<{ products: Product[] }>()
 
 const PRODUCT_INTERVAL = 3500
 
@@ -45,14 +47,10 @@ const nextProduct = (): void => {
 
 const { start, stop } = useAutoPlay(nextProduct, PRODUCT_INTERVAL)
 
-function handleClick(item: { product: HomeProduct; index: number; state: string }): void {
+function handleClick(item: { product: Product; index: number; state: string }): void {
   if (item.state === 'current') {
-    const category = item.product.category
-    if (category) {
-      router.push({ path: '/products', query: { category } })
-    } else {
-      router.push('/products')
-    }
+    // v2：直接进入商品详情页（原实现只能跳到产品中心并带上分类）
+    router.push('/products/' + item.product.id)
     return
   }
   if (item.index === currentIndex.value) return
@@ -68,12 +66,12 @@ function handleClick(item: { product: HomeProduct; index: number; state: string 
       :key="item.product.id"
       class="product-item"
       :class="item.state"
-      :style="{ backgroundImage: `url('${item.product.image}')` }"
+      :style="{ backgroundImage: `url('${assetUrl(item.product.image)}')` }"
       @click="handleClick(item)"
     >
       <div class="product-overlay">
         <h3>{{ item.product.name }}</h3>
-        <p>{{ item.product.desc }}</p>
+        <p>{{ item.product.description }}</p>
       </div>
     </div>
   </div>

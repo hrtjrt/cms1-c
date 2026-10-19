@@ -3,30 +3,40 @@ import { onMounted, ref } from 'vue'
 import HomeSlider from '@/components/home/HomeSlider.vue'
 import HomeProductStage from '@/components/home/HomeProductStage.vue'
 import HomeNewsPanel from '@/components/home/HomeNewsPanel.vue'
-import { fetchBanners, fetchHomeNews, fetchHomeProducts } from '@/api/home'
-import { unwrap } from '@/utils/request'
-import type { Banner, HomeProduct, NewsPreview } from '@/types'
+import { fetchHomeData } from '@/api/home'
+import type { Banner, NewsItem, Product } from '@/types'
 
-/* 首页：三个模块整体对应 hjc/index.html + js/home.js */
+/* 首页：三个模块整体对应 hjc/index.html + js/home.js
+   数据来自聚合接口 /api/public/home，一次请求拿全（轮播图 + 首页产品位 + 最新新闻）*/
+
+/** 首页新闻位固定展示 5 条（与 hjc 首页「新闻资讯」模块的条数一致） */
+const HOME_NEWS_LIMIT = 5
 
 const banners = ref<Banner[]>([])
-const homeProducts = ref<HomeProduct[]>([])
-const homeNews = ref<NewsPreview[]>([])
+const homeProducts = ref<Product[]>([])
+const homeNews = ref<NewsItem[]>([])
+const failed = ref(false)
 
 onMounted(async () => {
-  const [bannerData, productData, newsData] = await Promise.all([
-    unwrap(fetchBanners()),
-    unwrap(fetchHomeProducts()),
-    unwrap(fetchHomeNews())
-  ])
-  banners.value = bannerData
-  homeProducts.value = productData
-  homeNews.value = newsData
+  try {
+    const data = await fetchHomeData()
+    banners.value = data.banners
+    homeProducts.value = data.products
+    // 聚合接口给的是最新 6 条（新闻列表页每批也是 6 条），首页只取前 5 条
+    homeNews.value = data.news.slice(0, HOME_NEWS_LIMIT)
+  } catch {
+    // 后端未启动时保持空数据，页面骨架仍在，不会白屏
+    failed.value = true
+  }
 })
 </script>
 
 <template>
   <main class="home-page">
+    <div v-if="failed" class="offline-tip">
+      数据加载失败：请确认后端服务已启动（默认 http://localhost:3000）
+    </div>
+
     <HomeSlider :banners="banners" />
 
     <section class="section products-section">
@@ -42,6 +52,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.offline-tip {
+  background: #fff4e6;
+  color: #b45309;
+  border-bottom: 1px solid #ffe0b2;
+  padding: 10px 5%;
+  font-size: 14px;
+  text-align: center;
+  margin-top: var(--nav-h);
+}
+
 .section {
   padding: var(--gap-section, 80px) 0;
   background: var(--c-bg);

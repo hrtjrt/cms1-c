@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageHero from '@/components/common/PageHero.vue'
 import { useSiteStore } from '@/stores/site'
-import { MAP_EMBED_URL } from '@/config/site'
 import { submitContactMessage } from '@/api/contact'
+import { RequestError } from '@/utils/request'
 import { createEmptyContactForm, isFormValid, validateContactForm } from '@/utils/validate'
-import type { ContactFormErrors } from '@/types'
+import type { ContactFormErrors, PageHeroConfig } from '@/types'
 
 /* ==========================================================================
    联系我们
    对应 hjc/contact.html + js/contact.js：
-   左侧联系方式（与新闻页侧栏共用 SITE_CONTACT）、右侧留言表单（含逐字段校验）、底部地图
+   左侧联系方式、右侧留言表单（逐字段校验）、底部地图
+
+   v2 的变化：
+     · 联系方式与地图地址来自后台「站点管理」（store 里统一拉取）
+     · 表单真正提交到后端 /api/public/contact，会落库并在后台「留言管理」里出现
+     · 用页面内提示替代 window.alert（alert 在移动端体验差，也不利于自动化验证）
    ========================================================================== */
 
 const site = useSiteStore()
@@ -18,7 +23,21 @@ const site = useSiteStore()
 const form = reactive(createEmptyContactForm())
 const errors = ref<ContactFormErrors>({})
 const submitting = ref(false)
+const hero = ref<PageHeroConfig | null>(null)
+
+/** 提交结果提示：成功 / 失败（含后端返回的具体原因，例如限流提示） */
+const feedback = ref<{ type: 'success' | 'error'; text: string } | null>(null)
+
 const submitLabel = computed(() => (submitting.value ? '提交中...' : '提交留言'))
+
+const heroProps = computed(() => ({
+  title: hero.value?.title || '联系我们',
+  subtitle: hero.value?.subtitle || 'CONTACT US',
+  image: hero.value?.image || '',
+  height: hero.value?.height || '380px',
+  heightSm: hero.value?.heightSm || '280px',
+  mask: hero.value?.mask || 'rgba(10, 23, 218, 0.55)'
+}))
 
 /** 输入时实时清除该字段的错误提示 */
 function clearError(field: keyof ContactFormErrors): void {
@@ -29,34 +48,34 @@ function clearError(field: keyof ContactFormErrors): void {
 }
 
 async function handleSubmit(): Promise<void> {
+  feedback.value = null
   errors.value = validateContactForm(form)
   if (!isFormValid(errors.value)) return
 
   submitting.value = true
   try {
     await submitContactMessage(form)
-    window.alert('提交成功！感谢您的留言，我们会尽快与您联系。')
+    feedback.value = { type: 'success', text: '提交成功！感谢您的留言，我们会尽快与您联系。' }
     Object.assign(form, createEmptyContactForm())
     errors.value = {}
   } catch (error) {
-    window.alert('提交失败，请稍后重试')
-    console.error(error)
+    // 后端会把「提交过于频繁」这类具体原因带回来，直接展示给用户
+    const text =
+      error instanceof RequestError ? error.message : '提交失败，请稍后重试'
+    feedback.value = { type: 'error', text }
   } finally {
     submitting.value = false
   }
 }
+
+onMounted(async () => {
+  hero.value = await site.loadPageHero('contact')
+})
 </script>
 
 <template>
   <main class="contact-page">
-    <PageHero
-      title="联系我们"
-      subtitle="CONTACT US"
-      image="https://picsum.photos/1920/600?random=600&blur=3"
-      height="380px"
-      height-sm="280px"
-      mask="rgba(10, 23, 218, 0.55)"
-    />
+    <PageHero v-bind="heroProps" />
 
     <section class="contact-section">
       <div class="container">
@@ -147,6 +166,10 @@ async function handleSubmit(): Promise<void> {
                 <span v-if="errors.message" class="error-text">{{ errors.message }}</span>
               </div>
 
+              <div v-if="feedback" class="form-feedback" :class="feedback.type">
+                {{ feedback.text }}
+              </div>
+
               <button type="submit" class="submit-btn" :disabled="submitting">
                 {{ submitLabel }}
               </button>
@@ -160,7 +183,7 @@ async function handleSubmit(): Promise<void> {
     <section class="map-section">
       <iframe
         class="map-iframe"
-        :src="MAP_EMBED_URL"
+        :src="site.mapEmbedUrl"
         loading="lazy"
         allowfullscreen
         referrerpolicy="strict-origin-when-cross-origin"
@@ -341,6 +364,26 @@ async function handleSubmit(): Promise<void> {
 .map-section {
   height: 400px;
   background: var(--c-map-bg);
+}
+
+.form-feedback {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.form-feedback.success {
+  background: #e8f6ee;
+  color: #1a7f45;
+  border: 1px solid #b7e4c7;
+}
+
+.form-feedback.error {
+  background: #fdecec;
+  color: #b42318;
+  border: 1px solid #f6c7c4;
 }
 
 .map-iframe {

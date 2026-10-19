@@ -1,46 +1,31 @@
-import { SITE_CATEGORIES } from '@/config/site'
-import { mock } from '@/utils/request'
-import { cycle } from '@/utils/cycle'
-import type { ApiResult, Product } from '@/types'
+import { get } from '@/utils/request'
+import type { PageResult, Product, ProductCategory } from '@/types'
 
 /* ==========================================================================
-   产品接口
-   数据生成逻辑逐行搬运自 hjc/js/products.js（40 件、分类轮转、名词/形容词轮转、
-   随机价格、random=100+i 的占位图），保证 Vue 版与原版数据规模与顺序一致。
+   产品
+   后端只返回「已上产品中心且已启用」的商品（show_in_product_center = 1），
+   首页产品位则是这批数据里 show_on_homepage = 1 的子集，
+   因此前台不会拿到不该展示的商品，URL 直接访问被下架商品也会 404。
    ========================================================================== */
 
-/** 各分类下的产品名词 */
-const PRODUCT_NOUNS: Record<string, readonly string[]> = {
-  电子产品: ['平板电脑', '无线耳机', '智能手表', '蓝牙音箱', '电子书阅读器'],
-  家居用品: ['空气净化器', '扫地机器人', '智能台灯', '加湿器', '智能门锁'],
-  办公设备: ['激光打印机', '投影仪', '人体工学椅', '文件柜', '碎纸机'],
-  户外运动: ['登山背包', '运动水壶', '折叠帐篷', '运动手环', '登山鞋'],
-  安防系统: ['监控摄像头', '智能门铃', '声光报警器', '门禁系统', '指纹锁']
+/**
+ * 产品中心列表
+ *
+ * 本项目只有 40 件商品，前台一次性取全（all=1），
+ * 分类筛选与关键字搜索继续在本地做，保留原有的「哨兵无限滚动」交互。
+ * 数据量增长后把 all 去掉、改用 page/pageSize 即可，接口本来就支持。
+ */
+export async function fetchProducts(): Promise<Product[]> {
+  const result = await get<PageResult<Product>>('/api/public/products', { all: 1 })
+  return result.list
 }
 
-const ADJECTIVES = ['智能', '高端', '便携', '专业', '家用', '商务', '旗舰', '轻奢'] as const
+/** 商品详情；商品未上架时后端返回 404，抛 RequestError */
+export function fetchProductDetail(id: number): Promise<Product> {
+  return get<Product>(`/api/public/products/${id}`)
+}
 
-const TOTAL = 40
-
-/**
- * 生成全量产品列表。
- * 模块级缓存：单页应用不会重新加载脚本，列表需要在多次进出页面时保持稳定，
- * 否则每次进入产品中心价格都会重掷。
- */
-const ALL_PRODUCTS: Product[] = Array.from({ length: TOTAL }, (_, i) => {
-  const category = cycle(SITE_CATEGORIES, i)
-  const noun = cycle(PRODUCT_NOUNS[category] ?? [], i)
-  const adjective = cycle(ADJECTIVES, i)
-  return {
-    id: i + 1,
-    name: `${adjective}${noun}`,
-    category,
-    price: Math.floor(Math.random() * 2000) + 99,
-    image: `https://picsum.photos/400/300?random=${100 + i}`
-  }
-})
-
-/** 查询产品列表 */
-export function fetchProducts(): Promise<ApiResult<Product[]>> {
-  return mock(ALL_PRODUCTS)
+/** 前台可见的产品分类（带商品数） */
+export function fetchCategories(): Promise<ProductCategory[]> {
+  return get<ProductCategory[]>('/api/public/categories')
 }

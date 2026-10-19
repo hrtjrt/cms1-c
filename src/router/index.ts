@@ -1,14 +1,17 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useSiteStore } from '@/stores/site'
 import { SITE_NAME } from '@/config/site'
 
 /* ==========================================================================
    路由表
-   与 hjc 的多页结构一一对应：
+   与 hjc 的多页结构对应，并在 v2 补齐两个详情页：
      index.html    -> /
      about.html    -> /about
      products.html -> /products（支持 ?category=）
-     news.html     -> /news（支持 ?id=）
+     news.html     -> /news
      contact.html  -> /contact
+     （新增）       -> /news/:id      新闻详情
+     （新增）       -> /products/:id  商品详情
    ========================================================================== */
 
 const routes: RouteRecordRaw[] = [
@@ -31,10 +34,22 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '产品中心', navKey: 'products' }
   },
   {
+    path: '/products/:id',
+    name: 'productDetail',
+    component: () => import('@/views/ProductDetailView.vue'),
+    meta: { title: '商品详情', navKey: 'products' }
+  },
+  {
     path: '/news',
     name: 'news',
     component: () => import('@/views/NewsView.vue'),
     meta: { title: '新闻动态', navKey: 'news' }
+  },
+  {
+    path: '/news/:id',
+    name: 'newsDetail',
+    component: () => import('@/views/NewsDetailView.vue'),
+    meta: { title: '新闻详情', navKey: 'news' }
   },
   {
     path: '/contact',
@@ -55,9 +70,20 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 })
 })
 
+/* 站点公共数据（分类 / 联系方式 / 页脚）在首次导航时拉一次 */
+let siteLoaded = false
+
+router.beforeEach(async () => {
+  if (siteLoaded) return true
+  siteLoaded = true
+  // 失败也不阻塞导航：store 内部会退回本地默认值
+  await useSiteStore().load()
+  return true
+})
+
 router.afterEach((to) => {
   // 标题格式沿用 hjc：「页面名 - 公司官网」
-  document.title = `${to.meta.title ?? ''} - ${SITE_NAME}`
+  document.title = `${to.meta.title ?? ''} - ${useSiteStore().siteName || SITE_NAME}`
 })
 
 export default router
